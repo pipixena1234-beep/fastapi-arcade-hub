@@ -6,9 +6,12 @@ from typing import Dict, Any
 import json
 from openai import AsyncOpenAI
 
-# When you don't provide a base_url, it defaults to the official OpenAI cloud servers!
+# Read our free localtunnel endpoint from Render's dashboard configurations
+base_url = os.environ.get("OLLAMA_PROXY_URL", "http://localhost:11434/v1")
+
 ai_client = AsyncOpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY")
+    base_url=base_url,
+    api_key="ollama"
 )
 
 zone_router = APIRouter(prefix="/zone", tags=["Zone Defense"])
