@@ -20,7 +20,7 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # 3. Build a perfect absolute path to recipes.json 
 # Note: If your folder name on your computer is capitalized "Static", change "static" below to "Static"
-RECIPE_PATH = os.path.join(BASE_DIR, "static", "recipes.json")
+RECIPE_PATH = os.path.join(BASE_DIR, "Static", "recipes.json")
 
 # 4. Open and safe-load your dataset
 with open(RECIPE_PATH, "r") as file:
