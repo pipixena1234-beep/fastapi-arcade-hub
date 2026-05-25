@@ -27,7 +27,7 @@ app.add_middleware(
 # ... (then your app.include_router lines)
 app.include_router(adventure_router)
 app.include_router(tow_router)
-app.include_router(recipe_router)
+#app.include_router(recipe_router)
 app.include_router(portfolio_router)
 app.include_router(dice_router)
 app.include_router(zone_router)
