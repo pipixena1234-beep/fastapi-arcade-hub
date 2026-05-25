@@ -11,9 +11,9 @@ base_url = os.environ.get("OLLAMA_PROXY_URL", "http://localhost:11434/v1")
 
 ai_client = AsyncOpenAI(
     base_url=base_url,
-    api_key="ollama",  # Ollama requires this placeholder text, but doesn't check it
+    api_key="ollama",
     default_headers={
-        "Bypass-Tunnel-Reminder": "true"  # <-- This is the ONLY header localtunnel needs to step aside!
+        "ngrok-skip-browser-warning": "true"  # Tells ngrok to instantly let the AI through
     }
 )
 
