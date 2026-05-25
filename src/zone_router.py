@@ -6,10 +6,9 @@ from typing import Dict, Any
 import json
 from openai import AsyncOpenAI
 
-# Connect directly to your local hardware engine
+# When you don't provide a base_url, it defaults to the official OpenAI cloud servers!
 ai_client = AsyncOpenAI(
-    base_url="http://localhost:11434/v1",
-    api_key="ollama"  # Required placeholder string
+    api_key=os.environ.get("OPENAI_API_KEY")
 )
 
 zone_router = APIRouter(prefix="/zone", tags=["Zone Defense"])
