@@ -6,17 +6,14 @@ from typing import Dict, Any
 import json
 from openai import AsyncOpenAI
 
-# 1. Fetch your tunnel proxy target
+# 1. Grab your localtunnel URL from your Render settings
 base_url = os.environ.get("OLLAMA_PROXY_URL", "http://localhost:11434/v1")
-# 2. Fetch your IP password string from your Render configurations
-tunnel_password = os.environ.get("LOCALTUNNEL_PASSWORD", "")
 
 ai_client = AsyncOpenAI(
     base_url=base_url,
-    api_key="ollama",  # Required placeholder string
+    api_key="ollama",  # Ollama requires this placeholder text, but doesn't check it
     default_headers={
-        "Bypass-Tunnel-Reminder": "true",
-        "Authorization": f"Bearer {tunnel_password}" if tunnel_password else ""
+        "Bypass-Tunnel-Reminder": "true"  # <-- This is the ONLY header localtunnel needs to step aside!
     }
 )
 
