@@ -1,0 +1,102 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest Adventure Game</title>
+    <style>body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            border: 2px solid #333;
+            padding: 20px;
+            background-color: #000;
+        }
+
+        button {
+            background: #444;
+            color: white;
+            border: 1px solid #777;
+            padding: 10px;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+
+        button:hover { background: #666; }
+
+        input {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px;
+            width: 70%;
+        }
+
+        #game-output {
+            background: #111;
+            padding: 15px;
+            border-left: 4px solid #00ff00;
+            margin: 20px 0;
+            font-size: 1.1em;
+        }
+
+        pre { color: #888; font-size: 0.8em; overflow-x: auto; }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>📜 API QUEST</h1>
+
+        <div id="game-output">
+            Read the notes!
+        </div>
+
+        <div>
+            <input id="api-path" type="text" value="">
+            <button onclick="runCommand()">RUN [GET]</button>
+        </div>
+        <hr>
+
+        <strong>System Logs:</strong>
+        <pre id="raw-output">{}</pre>
+    </div>
+    <script>
+        async function runCommand() {
+            const path = document.getElementById('api-path').value;
+            const gameOutput = document.getElementById('game-output');
+            const rawOutput = document.getElementById('raw-output');
+
+            gameOutput.innerHTML = "Fetching data...";
+
+            try {
+                const response = await fetch(path);
+                const contentType = response.headers.get("content-type");
+
+                if (contentType && contentType.includes("application/json")) {
+                    const data = await response.json();
+                    rawOutput.innerText = JSON.stringify(data, null, 4);
+                    gameOutput.innerHTML = `JSON RECEIVED: ${data.name || ''} - ${data.structure || ''}<br>Next: ${data['Where to go next'] || 'Unknown'}`;
+                } else {
+                    const data = await response.text();
+                    rawOutput.innerText = data;
+                    gameOutput.innerHTML = data.replace(/\n/g, '<br>');
+                }
+            } catch (error) {
+                gameOutput.innerHTML = "Error: Could not reach the server.";
+                rawOutput.innerText = error;
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+

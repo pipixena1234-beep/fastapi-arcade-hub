@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TOW - Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+            overflow: hidden;
+            background-color: #020617;
+        }
+
+        .pull-active { transform: scale(0.9) !important; filter: brightness(1.5); }
+
+        .team-a-theme { background: radial-gradient(circle at center, #1e1b4b 0%, #020617 100%); }
+        .team-b-theme { background: radial-gradient(circle at center, #450a0a 0%, #020617 100%); }
+
+        .rope-lane { height: 12px; background: #1e293b; position: relative; border-radius: 10px; overflow: hidden; }
+        #marker-track { height: 100%; width: 0%; transition: width 0.2s ease-out; }
+
+        .pull-btn-shadow { box-shadow: 0 0 40px rgba(255,255,255,0.1); }
+
+        /* Countdown Animation */
+        .countdown-pulse { animation: pulse-text 0.5s ease-in-out; }
+        @keyframes pulse-text {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body id="player-body" class="text-slate-100 min-h-screen p-6 transition-colors duration-500">
+
+    <div id="countdown-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 hidden">
+        <div id="countdown-number" class="text-9xl font-black italic countdown-pulse text-indigo-500">3</div>
+    </div>
+
+    <div class="max-w-md mx-auto h-screen flex flex-col justify-between py-8">
+
+        <div class="flex justify-between items-center bg-slate-900/50 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
+            <div>
+                <h2 id="display-name" class="font-black uppercase text-xs tracking-widest text-indigo-400">Player</h2>
+                <div id="game-id-tag" class="text-[10px] font-mono text-slate-500">ID: ----</div>
+            </div>
+            <div id="team-badge" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-black uppercase tracking-tighter">Spectating</div>
+        </div>
+
+        <div id="lobby-state" class="space-y-6">
+            <div class="text-center">
+                <h3 class="text-4xl font-black italic tracking-tighter mb-2">PICK YOUR SIDE</h3>
+                <p class="text-slate-500 text-sm font-bold uppercase tracking-widest">Awaiting Match Start</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="setTeam('A')" class="group relative bg-blue-600 hover:bg-blue-500 p-6 rounded-2xl transition-all active:scale-95 overflow-hidden">
+                    <span class="relative z-10 font-black text-2xl italic tracking-tighter text-white">JOIN TEAM A</span>
+                    <div class="absolute inset-0 bg-white/10 opacity-0 group-active:opacity-100"></div>
+                </button>
+
+                <button onclick="setTeam('B')" class="group relative bg-red-600 hover:bg-red-500 p-6 rounded-2xl transition-all active:scale-95 overflow-hidden">
+                    <span class="relative z-10 font-black text-2xl italic tracking-tighter text-white">JOIN TEAM B</span>
+                    <div class="absolute inset-0 bg-white/10 opacity-0 group-active:opacity-100"></div>
+                </button>
+
+                <button onclick="setTeam('spectator')" class="text-slate-500 font-bold py-4 hover:text-white transition">
+                    STAY IN LOUNGE
+                </button>
+            </div>
+        </div>
+
+        <div id="spectator-view" class="hidden space-y-4 text-center">
+            <p class="text-xs font-black uppercase text-slate-500 tracking-widest">Live Progress</p>
+            <div class="rope-lane">
+                <div id="marker-track" class="bg-indigo-500"></div>
+            </div>
+            <p class="italic text-slate-400">Watching from the stands...</p>
+        </div>
+
+        <div id="game-state" class="hidden text-center flex-1 flex flex-col justify-center items-center">
+            <h1 id="status-msg" class="text-5xl font-black italic mb-12 tracking-tighter">READY?</h1>
+
+            <div class="relative">
+                <div id="btn-glow" class="absolute inset-0 rounded-full blur-3xl opacity-20"></div>
+                <button id="pull-btn" disabled
+                    onmousedown="pull()" ontouchstart="pull()"
+                    class="relative w-64 h-64 rounded-full bg-white text-slate-950 font-black text-5xl italic tracking-tighter pull-btn-shadow transition-transform active:scale-90 disabled:opacity-10">
+                    PULL!
+                </button>
+            </div>
+        </div>
+
+        <div id="footer-msg" class="text-center text-[10px] font-bold text-slate-600 uppercase tracking-[0.3em]">
+            Stadium Sync Active
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        // Use 'game_id' and 'client_id' to match your router and rubik.html
+        const gameId = urlParams.get('game_id');
+        const clientId = urlParams.get('client_id');
+        let ws;
+        let currentTeam = 'spectator';
+        let isMatchLive = false;
+
+        async function init() {
+            const name = localStorage.getItem('tow_name') || "Player";
+            document.getElementById('display-name').innerText = name;
+            document.getElementById('game-id-tag').innerText = `ID: ${gameId}`;
+
+            if (!gameId || !clientId) {
+                window.location.href = "/tow/";
+                return;
+            }
+            connect();
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/tow/ws/${gameId}/${clientId}`);
+
+            ws.onmessage = (e) => {
+                const state = JSON.parse(e.data);
+                if (state.type === "TERMINATED") return window.location.href = "/tow/";
+                if (state.type === "UPDATE") updateUI(state);
+            };
+
+            ws.onclose = () => {
+                setTimeout(connect, 2000); // Auto-reconnect if dropped
+            };
+        }
+
+        function updateUI(state) {
+            const lobby = document.getElementById('lobby-state');
+            const gameUI = document.getElementById('game-state');
+            const specUI = document.getElementById('spectator-view');
+            const btn = document.getElementById('pull-btn');
+            const body = document.getElementById('player-body');
+            const badge = document.getElementById('team-badge');
+
+            // 1. Determine Player's Current Team from Server State
+            const me = state.players[clientId];
+            if (me) {
+                currentTeam = me.team;
+                badge.innerText = currentTeam === 'spectator' ? "Spectating" : `Team ${currentTeam}`;
+                badge.className = `px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${
+                        currentTeam === 'A' ? 'bg-blue-600' : currentTeam === 'B' ? 'bg-red-600' : 'bg-slate-800'
+                        }`;
+            }
+
+            // 2. Handle Countdown / Game Start
+            if (state.active && !isMatchLive) {
+                isMatchLive = true;
+                triggerCountdown();
+            } else if (!state.active) {
+                isMatchLive = false;
+            }
+
+            // 3. Switch Views based on Game State
+            if (state.active) {
+                lobby.classList.add('hidden');
+                if (currentTeam === 'spectator') {
+                    specUI.classList.remove('hidden');
+                    gameUI.classList.add('hidden');
+                    // Update spectator mini-rope
+                    const progress = 50 + (state.counter / state.target_n * 50);
+                    document.getElementById('marker-track').style.width = `${progress}%`;
+                } else {
+                    specUI.classList.add('hidden');
+                    gameUI.classList.remove('hidden');
+                    btn.disabled = false;
+                    // Change theme based on team
+                    body.className = `text-slate-100 min-h-screen p-6 transition-colors duration-500 ${
+                            currentTeam === 'A' ? 'team-a-theme' : 'team-b-theme'
+                            }`;
+                }
+            } else {
+                // Game is over or waiting
+                lobby.classList.remove('hidden');
+                gameUI.classList.add('hidden');
+                specUI.classList.add('hidden');
+                body.className = "text-slate-100 min-h-screen p-6 transition-colors duration-500 bg-slate-950";
+
+                if (state.winner) {
+                    alert(`Team ${state.winner} won the match!`);
+                }
+            }
+        }
+
+        function setTeam(team) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: "SWITCH_TEAM", team: team}));
+            }
+        }
+
+        function pull() {
+            if (ws && ws.readyState === WebSocket.OPEN && isMatchLive) {
+                ws.send(JSON.stringify({type: "PULL"}));
+                // Haptic feedback for mobile
+                if ("vibrate" in navigator) navigator.vibrate(15);
+            }
+        }
+
+        function triggerCountdown() {
+            const overlay = document.getElementById('countdown-overlay');
+            const num = document.getElementById('countdown-number');
+            overlay.classList.remove('hidden');
+            let count = 3;
+            num.innerText = count;
+
+            const timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    num.innerText = count;
+                } else if (count === 0) {
+                    num.innerText = "GO!";
+                } else {
+                    clearInterval(timer);
+                    overlay.classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        // Initialize on load
+        window.onload = init;
+    </script>
+</body>
+</html>

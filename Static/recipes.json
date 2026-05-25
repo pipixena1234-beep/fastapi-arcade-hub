@@ -1,0 +1,77 @@
+{
+  "recipes": [
+    {
+      "name": "Pancakes",
+      "ingredients": ["flour", "milk", "eggs", "sugar"],
+      "steps": [
+        "Sift flour and sugar together in a large bowl. \n      Make a well in the center and add milk, melted butter, and egg; mix until smooth.",
+        " Heat a lightly oiled griddle or pan over medium-high heat. Pour or scoop the batter onto the griddle, using approximately 1/4 cup for each pancake; cook until bubbles form and the edges are dry, about 2 to 3 minutes.",
+        "Flip and cook until golden brown on both sides"
+      ],
+      "image_url": "https://eggs.ca/wp-content/uploads/2024/06/fluffy-pancakes-1664x832-1.jpg"
+    },
+    {
+      "name": "Spaghetti Bolognese",
+      "ingredients": ["pasta", "beef", "tomato sauce", "onion"],
+      "steps": [
+        "Cook pasta according to package instructions.",
+        "BIn a separate pan, brown beef with onion, then add tomato sauce and simmer."
+      ],
+      "image_url": "https://ichef.bbci.co.uk/food/ic/food_16x9_1600/recipes/spaghetti_bolognese_43191_16x9.jpg"
+    },
+    {
+      "name": "Avocado Toast",
+      "ingredients": ["bread", "avocado", "salt", "pepper"],
+      "steps": [
+        "Toast the bread slices.",
+        "Mash avocado and spread on toast, then season."
+      ],
+      "image_url": "https://www.rootsandradishes.com/wp-content/uploads/2017/08/avocado-toast-with-everything-bagel-seasoning-feat.jpg"
+    },
+    {
+      "name": "Cheese Omelette",
+      "ingredients": ["eggs", "cheese", "butter", "salt"],
+      "steps": [
+        "Beat eggs with salt.",
+        "Cook in butter, add cheese, fold, and serve."
+      ],
+      "image_url": "https://stordfkenticomedia.blob.core.windows.net/df-us/rms/media/recipemediafiles/recipe%20images%20and%20files/retail/desktop%20(600x600)/2025/april/2025_retail_classic-cheese-omelet_600x600.webp?ext=.webp"
+    },
+    {
+      "name": "Ramen",
+      "ingredients": ["noodles", "eggs", "chilli-garlic paste", "sesame oil"],
+      "steps": [
+        "Cook noodles and boil eggs separately.",
+        "Combine noodles with seasoning and top with eggs."
+      ],
+      "image_url": "https://assets.bonappetit.com/photos/5e3c7a3c866b940008106763/4:3/w_4640,h_3480,c_limit/HLY-Veggie-Ramen-16x9.jpg"
+    },
+    {
+      "name": "Cheese Pizza",
+      "ingredients": ["flour", "eggs", "tomato sauce", "cheese"],
+      "steps": [
+        "Prepare dough and spread tomato sauce.",
+        "Add cheese and bake until crust is golden."
+      ],
+      "image_url": "https://kitchenatics.com/wp-content/uploads/2020/09/Cheese-pizza-1.jpg"
+    },
+    {
+      "name": "Sushi",
+      "ingredients": ["rice", "seaweed", "crab stick", "cucumber"],
+      "steps": [
+        "Spread rice on seaweed sheet.",
+        "Add fillings, roll tightly, and slice."
+      ],
+      "image_url": "https://www.justonecookbook.com/wp-content/uploads/2020/01/Sushi-Rolls-Maki-Sushi-%E2%80%93-Hosomaki-1117-I.jpg"
+    },
+    {
+      "name": "Chocolate Cake",
+      "ingredients": ["flour", "coco powder", "sugar", "eggs", "milk"],
+      "steps": [
+        "Mix all ingredients into a batter.",
+        "Pour into a pan and bake until cooked through."
+      ],
+      "image_url": "https://sallysbakingaddiction.com/wp-content/uploads/2013/04/triple-chocolate-cake-4.jpg"
+    }
+  ]
+}

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zone Defense: Tactical Radar</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #020617;
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: row;
+            gap: 1.25rem;
+            width: 100%;
+            height: 100%;
+            padding: 1.25rem;
+        }
+
+        .sidebar {
+            width: 270px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 1.25rem;
+        }
+
+        .comms-panel {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+        .comms-scroll {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(51,65,85,0.5) transparent;
+        }
+
+        .ops-panel {
+            flex-shrink: 0;
+            height: 36%;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+        .ops-scroll {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .main-panel {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            padding: 1.75rem 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .radar-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+        }
+        .radar-wrap svg {
+            height: 100%;
+            max-height: 66vh;
+            width: auto;
+            display: block;
+        }
+
+        .zone-circle {
+            fill: rgba(30, 41, 59, 0.3);
+            stroke: rgba(51, 65, 85, 0.8);
+            stroke-width: 2;
+            transition: fill 0.2s, stroke 0.2s;
+            cursor: pointer;
+        }
+        .zone-circle:hover        { fill: rgba(59,130,246,0.12); stroke: #3b82f6; }
+        .zone-active              { fill: rgba(16,185,129,0.28) !important; stroke: #10b981 !important; stroke-width: 5; }
+        .zone-dangerous           { fill: rgba(239,68,68,0.18); stroke: #ef4444; stroke-width: 2.5; }
+
+        .threat-dot { fill: #ef4444; pointer-events: none; }
+        @keyframes blink { from { opacity: 0.3; } to { opacity: 1; } }
+        .threat-dot { animation: blink 1s ease-in-out infinite alternate; }
+
+        .zone-label {
+            font-size: 13px;
+            font-weight: 900;
+            font-family: 'Courier New', monospace;
+            fill: rgba(255,255,255,0.45);
+            cursor: pointer;
+            user-select: none;
+            pointer-events: all;
+            transition: fill 0.15s;
+        }
+        .zone-label:hover { fill: rgba(255,255,255,0.9); }
+
+        .section-label {
+            font-size: 9px;
+            font-weight: 900;
+            color: rgba(100,116,139,0.75);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            margin-bottom: 0.6rem;
+            flex-shrink: 0;
+        }
+        .log-line {
+            font-size: 10px;
+            line-height: 1.6;
+            color: rgba(148,163,184,0.75);
+        }
+        .log-line.penalty { color: #f87171; }
+        .log-line.warning { color: #fbbf24; }
+
+        .op-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0.6rem;
+            border-radius: 0.6rem;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 0.35rem;
+        }
+        .op-card.me { border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.07); }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 0.6rem;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 9px;
+            font-weight: 700;
+            color: rgba(148,163,184,0.65);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .ldot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+        .conn-banner {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.3rem 0.75rem;
+            border-radius: 9999px;
+            border: 1px solid;
+            transition: all 0.4s;
+        }
+        .conn-banner.connected    { color: #34d399; border-color: rgba(52,211,153,0.3); background: rgba(16,185,129,0.08); }
+        .conn-banner.connecting   { color: #fbbf24; border-color: rgba(251,191,36,0.3);  background: rgba(251,191,36,0.07); }
+        .conn-banner.disconnected { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(239,68,68,0.07); }
+        .conn-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .conn-banner.connected .conn-dot  { animation: blink 1.5s ease-in-out infinite alternate; }
+        .conn-banner.connecting .conn-dot { animation: blink 0.6s ease-in-out infinite alternate; }
+
+        .toast {
+            position: fixed;
+            bottom: 1.25rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(239,68,68,0.15);
+            border: 1px solid rgba(239,68,68,0.4);
+            color: #fca5a5;
+            padding: 0.35rem 1.1rem;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-family: monospace;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.4s;
+            white-space: nowrap;
+            z-index: 100;
+        }
+        .toast.gone { opacity: 0; }
+
+        [v-cloak] { display: none !important; }
+
+        .stability-bar-wrap {
+            height: 3px;
+            background: rgba(51, 65, 85, 0.4);
+            border-radius: 9999px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .stability-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.9s linear, background-color 0.3s;
+        }
+    </style>
+</head>
+<body>
+{% raw %}
+<div id="app" v-cloak>
+    <div class="sidebar">
+        <div class="glass comms-panel">
+            <div class="section-label">Tactical Comms</div>
+            <div class="comms-scroll">
+                <div v-for="log in logs" :key="log.id"
+                     class="log-line"
+                     :class="{penalty: log.isPenalty, warning: log.isWarning}">
+                    {{ log.time }} &rsaquo; {{ log.text }}
+                </div>
+            </div>
+        </div>
+
+        <div class="glass ops-panel">
+            <div class="section-label">Operatives</div>
+            <div class="ops-scroll">
+                <div v-for="p in leaderboard" :key="p.name"
+                     class="op-card" :class="{me: p.name === name}">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">{{ p.name }}</div>
+                        <div style="font-size:8px;color:rgba(100,116,139,0.75);text-transform:uppercase;letter-spacing:0.1em">Sector {{ p.zone }}</div>
+                        <!-- Stability bar: only on YOUR card -->
+                        <template v-if="p.name === name">
+                            <div style="font-size:8px;margin-top:3px;"
+                                 :style="{color: stayTime > 5 ? '#f87171' : 'rgba(100,116,139,0.7)'}">
+                                STABILITY: {{ Math.max(0, maxStay - stayTime) }}s
+                            </div>
+                            <div class="stability-bar-wrap">
+                                <div class="stability-bar"
+                                     :style="{
+                                         width: Math.max(0, ((maxStay - stayTime) / maxStay) * 100) + '%',
+                                         backgroundColor: stayTime > 5 ? '#ef4444' : stayTime > 3 ? '#f59e0b' : '#10b981'
+                                     }">
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <span style="font-size:17px;font-weight:900;color:#34d399;margin-left:0.5rem;">{{ p.score }}</span>
+                </div>
+                <div v-if="leaderboard.length === 0"
+                     style="font-size:9px;color:rgba(100,116,139,0.45)">
+                    Awaiting operatives...
+                </div>
+            </div>
+        </div>
+
+
+<div style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 0.05em;">
+        📡 COMMS CHANNEL
+    </div>
+
+    <!-- FIX 1: added ref="chatScroll" so we can auto-scroll to newest message -->
+    <div ref="chatScroll" style="height: 120px; overflow-y: auto; background: rgba(15, 23, 42, 0.4); border: 1px solid #1e293b; border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 4px;">
+        <div v-for="(c, idx) in chatMessages" :key="idx" style="font-size: 11px; line-height: 1.4;">
+            <span :style="{ color: c.sender === name ? '#34d399' : '#38bdf8' }" style="font-weight: 700;">
+                [{{ c.sender }}]:
+            </span>
+            <span style="color: #e2e8f0; margin-left: 4px;">{{ c.msg }}</span>
+        </div>
+        <div v-if="chatMessages.length === 0" style="font-size: 10px; color: #475569; font-style: italic; text-align: center; margin-top: 40px;">
+            No incoming transmissions...
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 6px;">
+        <input v-model="chatInput"
+               @keyup.enter="sendChat"
+               placeholder="Transmit message..."
+               style="flex-grow: 1; background: #0f172a; border: 1px solid #334155; border-radius: 4px; color: #fff; padding: 6px 8px; font-size: 11px; outline: none;" />
+        <button @click="sendChat"
+                style="background: #1e293b; border: 1px solid #475569; color: #38bdf8; padding: 4px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;">
+            SEND
+        </button>
+    </div>
+</div>
+
+    </div>
+
+
+
+    <div class="glass main-panel">
+
+        <div style="flex-shrink:0;margin-bottom:0.4rem;">
+            <div style="font-size:24px;font-weight:900;font-style:italic;letter-spacing:-0.04em;line-height:1">ZONE DEFENSE</div>
+            <div style="font-size:7px;font-weight:700;color:rgba(100,116,139,0.65);letter-spacing:0.5em;text-transform:uppercase;margin-top:3px">Sector Vulnerability Monitor</div>
+        </div>
+
+        <div class="conn-banner" :class="connStatus">
+            <span class="conn-dot"></span>
+            {{ connLabel }}
+        </div>
+
+        <div class="radar-wrap">
+            <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="140" cy="160" r="90"
+                        @click="handleAction('A')"
+                        :class="getZoneClass('A')"
+                        class="zone-circle"/>
+                <circle cx="260" cy="160" r="90"
+                        @click="handleAction('B')"
+                        :class="getZoneClass('B')"
+                        class="zone-circle"/>
+                <circle cx="200" cy="260" r="90"
+                        @click="handleAction('C')"
+                        :class="getZoneClass('C')"
+                        class="zone-circle"/>
+
+                <circle v-for="dot in dots" :key="dot.id"
+                        :cx="dot.x" :cy="dot.y" r="3.5"
+                        class="threat-dot"/>
+
+                <text v-for="(pos, zone) in zonePositions" :key="'lbl-'+zone"
+                      :x="pos.x" :y="pos.y"
+                      text-anchor="middle"
+                      dominant-baseline="central"
+                      class="zone-label"
+                      @click.stop="handleAction(zone)">
+                    {{ zone }} ({{ zones[zone] || 0 }})
+                </text>
+            </svg>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><span class="ldot" style="background:#10b981"></span>Green = your sector</div>
+            <div class="legend-item"><span class="ldot" style="background:#3b82f6"></span>Click = move (adjacent only)</div>
+            <div class="legend-item"><span class="ldot" style="background:#ef4444"></span>Dbl-click = push threat</div>
+        </div>
+    </div>
+</div>
+<div id="toast" class="toast gone"></div>
+{% endraw %}
+<script>
+const { createApp } = Vue;
+
+const ADJACENCY = {
+    "A":   ["AB", "AC"],
+    "B":   ["AB", "BC"],
+    "C":   ["AC", "BC"],
+    "AB":  ["A", "B", "ABC"],
+    "BC":  ["B", "C", "ABC"],
+    "AC":  ["A", "C", "ABC"],
+    "ABC": ["AB", "BC", "AC"]
+};
+
+let toastTimer = null;
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.remove('gone');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('gone'), 2800);
+}
+
+createApp({
+    data() {
+        return {
+            name: 'OPR_' + String(Math.floor(Math.random() * 9999)).padStart(4, '0'),
+            ws: null,
+            connStatus: 'connecting',
+            myZone: 'A',
+            zones: { A:0, B:0, C:0, AB:0, BC:0, AC:0, ABC:0 },
+            leaderboard: [],
+            logs: [],
+            dots: [],
+            clickTimer: null,
+            isSyncLocked: false,
+            logCounter: 0,
+            reconnectAttempts: 0,
+            stayTime: 0,
+            stayInterval: null,
+            maxStay: 8,
+            zonePositions: {
+                "A":   { x: 100, y: 140 },
+                "B":   { x: 300, y: 140 },
+                "C":   { x: 200, y: 318 },
+                "AB":  { x: 200, y: 118 },
+                "BC":  { x: 278, y: 240 },
+                "AC":  { x: 122, y: 240 },
+                "ABC": { x: 200, y: 200 }
+            },
+            zoneRegions: {
+                "A":   { x: 105, y: 145, r: 40 },
+                "B":   { x: 295, y: 145, r: 40 },
+                "C":   { x: 200, y: 308, r: 40 },
+                "AB":  { x: 200, y: 125, r: 16 },
+                "BC":  { x: 274, y: 228, r: 16 },
+                "AC":  { x: 126, y: 228, r: 16 },
+                "ABC": { x: 200, y: 200, r: 13 }
+            },
+            chatInput: '',
+            chatMessages: []
+        };
+    },
+
+    computed: {
+        connLabel() {
+            if (this.connStatus === 'connected')  return 'Online';
+            if (this.connStatus === 'connecting') return 'Connecting' + (this.reconnectAttempts > 0 ? ' (' + this.reconnectAttempts + ')' : '') + '...';
+            return 'Offline';
+        }
+    },
+
+    // FIX 2: watch was nested inside methods{} before — Vue never saw it
+    watch: {
+        myZone(newVal, oldVal) {
+            if (newVal !== oldVal) {
+                this.stayTime = 0;
+            }
+        }
+    },
+
+    mounted() {
+        this.connect();
+        setInterval(() => {
+            if (this.connStatus === 'connected') {
+                this.stayTime++;
+            }
+        }, 1000);
+    },
+
+    methods: {
+        startStayTimer() {
+            this.stayInterval = setInterval(() => {
+                this.stayTime++;
+            }, 1000);
+        },
+
+        sendChat() {
+            if (!this.chatInput || !this.chatInput.trim()) return;
+            this.ws.send(JSON.stringify({
+                type: "chat",
+                msg: this.chatInput.trim()
+            }));
+            this.chatInput = '';
+        },
+
+        handleMoveSuccess(newZone) {
+            this.myZone = newZone;
+            this.stayTime = 0;
+        },
+
+        connect() {
+            this.connStatus = 'connecting';
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            try {
+                this.ws = new WebSocket(`${proto}//${location.host}/zone/ws`);
+            } catch (err) {
+                this.addLog('WS error: ' + err.message, true);
+                this.scheduleReconnect();
+                return;
+            }
+
+            this.ws.onopen = () => {
+                this.connStatus = 'connected';
+                this.reconnectAttempts = 0;
+                this.ws.send(JSON.stringify({ name: this.name }));
+                this.addLog('Neural link established.');
+            };
+
+            this.ws.onmessage = (e) => {
+                let d;
+                try { d = JSON.parse(e.data); } catch { return; }
+
+                if (d.type === 'move_confirm') {
+                    this.myZone = d.your_zone;
+                    this.isSyncLocked = false;
+                } else if (d.type === 'move_reject') {
+                    this.myZone = d.your_zone;
+                    this.isSyncLocked = false;
+                    showToast(d.msg);
+                    this.addLog(d.msg, false, true);
+                } else if (d.type === 'push_reject') {
+                    showToast(d.msg);
+                    this.addLog(d.msg, false, true);
+                } else if (d.type === 'init' && !this.isSyncLocked) {
+                    this.myZone = d.your_zone;
+
+                // FIX 3: `data` doesn't exist here — the variable is `d`
+                } else if (d.type === 'chat_message') {
+                    this.chatMessages.push({
+                        sender: d.sender,  // was: data.sender (ReferenceError)
+                        msg:    d.msg      // was: data.msg    (ReferenceError)
+                    });
+                    if (this.chatMessages.length > 30) this.chatMessages.shift();
+                    // FIX 4: auto-scroll to newest message after Vue updates the DOM
+                    this.$nextTick(() => {
+                        const el = this.$refs.chatScroll;
+                        if (el) el.scrollTop = el.scrollHeight;
+                    });
+                }
+
+                if (d.zones)      { this.zones = d.zones; this.generateDots(); }
+                if (d.leaderboard) {
+                    this.leaderboard = d.leaderboard;
+                    if (!this.isSyncLocked) {
+                        const me = d.leaderboard.find(p => p.name === this.name);
+                        if (me && me.zone) this.myZone = me.zone;
+                    }
+                }
+                if (d.msg) {
+                    this.addLog(d.msg,
+                        d.msg.includes('🔥') || d.msg.includes('hit'),
+                        d.msg.includes('⚠')  || d.msg.includes('⛔'));
+                }
+            };
+
+            this.ws.onclose = () => {
+                this.connStatus = 'disconnected';
+                this.addLog('Connection lost — reconnecting...', false, true);
+                this.scheduleReconnect();
+            };
+        },
+
+        scheduleReconnect() {
+            const delay = Math.min(2000 * Math.pow(2, this.reconnectAttempts), 16000);
+            this.reconnectAttempts++;
+            setTimeout(() => this.connect(), delay);
+        },
+
+        generateDots() {
+            const next = [];
+            for (const [zone, count] of Object.entries(this.zones)) {
+                if (!count || count <= 0) continue;
+                const region = this.zoneRegions[zone];
+                if (!region) continue;
+                for (let i = 0; i < Math.min(count, 45); i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist  = Math.sqrt(Math.random()) * region.r;
+                    next.push({
+                        id: zone + '-' + i + '-' + Math.random(),
+                        x: region.x + Math.cos(angle) * dist,
+                        y: region.y + Math.sin(angle) * dist
+                    });
+                }
+            }
+            this.dots = next;
+        },
+
+        addLog(text, isPenalty = false, isWarning = false) {
+            this.logs.unshift({ id: this.logCounter++, time: new Date().toLocaleTimeString(), text, isPenalty, isWarning });
+            if (this.logs.length > 40) this.logs.pop();
+        },
+
+        getZoneClass(z) {
+            const isActive    = this.myZone.includes(z);
+            const isDangerous = !isActive && (this.zones[z] || 0) > 80;
+            return { 'zone-active': isActive, 'zone-dangerous': isDangerous };
+        },
+
+        isAdjacent(from, to) {
+            return !!(ADJACENCY[from] && ADJACENCY[from].includes(to));
+        },
+
+        handleAction(targetZone) {
+            if (this.connStatus !== 'connected') { showToast('Not connected to server.'); return; }
+
+            if (this.clickTimer) {
+                clearTimeout(this.clickTimer);
+                this.clickTimer = null;
+                if (targetZone === this.myZone)                { showToast("Can't push to your own zone.");                     return; }
+                if (!this.isAdjacent(this.myZone, targetZone)) { showToast(targetZone + ' not adjacent to ' + this.myZone + '.'); return; }
+                if ((this.zones[this.myZone] || 0) <= 0)      { showToast('No threats in ' + this.myZone + ' to push.');       return; }
+                this.ws.send(JSON.stringify({ type: 'push_dot', from: this.myZone, to: targetZone }));
+                this.addLog('Pushed threat: ' + this.myZone + ' → ' + targetZone);
+            } else {
+                if (targetZone === this.myZone) return;
+                this.clickTimer = setTimeout(() => {
+                    this.clickTimer = null;
+                    this.myZone = targetZone;
+                    this.ws.send(JSON.stringify({type: 'move', target: targetZone}));
+                }, 250);
+            }
+        }
+    }
+}).mount('#app');
+
+</script>
+</body>
+</html>

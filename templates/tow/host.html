@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TOW - Stadium Console</title>
+    <style>
+        @import url('https://googleapis.com');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #020617;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* Header Layout */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .label {
+            color: #6366f1;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 28px;
+            margin: 0;
+        }
+
+        /* Stadium Box */
+        .stadium {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid #334155;
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        /* The Horizontal Scoreboard */
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .team-box {
+            width: 30%;
+        }
+
+        .team-a {
+            color: #3b82f6;
+            font-size: 60px;
+            font-style: italic;
+            font-weight: 900;
+        }
+
+        .team-b {
+            color: #ef4444;
+            font-size: 60px;
+            font-style: italic;
+            font-weight: 900;
+        }
+
+        .players-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 5px;
+        }
+
+        .momentum-box {
+            width: 40%;
+        }
+
+        #click-counter {
+            font-size: 64px;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* The Rope */
+        .rope-track {
+            height: 10px;
+            background: #1e293b;
+            border-radius: 10px;
+            position: relative;
+            margin: 60px 0;
+            border: 1px solid #334155;
+        }
+
+        #host-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 60px;
+            background: white;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px #6366f1;
+            transition: left 0.1s ease-out;
+            border-radius: 4px;
+        }
+
+        /* Buttons */
+        .btn-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-start {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #1e293b;
+            color: white;
+            border: 1px solid #334155;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Winner UI */
+        #winner-trophy {
+            display: none;
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #facc15;
+            color: #020617;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-weight: 900;
+            font-size: 24px;
+            box-shadow: 0 10px 30px rgba(250, 204, 21, 0.4);
+        }
+    </style>
+</head>
+<body>
+<div id="winner-trophy">🏆 TEAM <span id="winner-name"></span> WINS!</div>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <div class="label">Arena Feed</div>
+            <h1 class="val">{{ game_id }} <span id="status-badge" style="opacity: 0.4; font-size: 14px;">WAITING</span>
+            </h1>
+        </div>
+        <div style="text-align: right;">
+            <div class="label">Match Clock</div>
+            <div id="match-timer" class="val">00:00.0</div>
+        </div>
+    </div>
+
+    <div class="stadium">
+        <div class="scoreboard">
+            <div class="team-box">
+                <div class="team-a">A</div>
+                <div id="count-a" class="players-count">Players: 0</div>
+            </div>
+
+            <div class="momentum-box">
+                <div class="label" style="color: #64748b;">Momentum</div>
+                <div id="click-counter">0</div>
+            </div>
+
+            <div class="team-box">
+                <div class="team-b">B</div>
+                <div id="count-b" class="players-count">Players: 0</div>
+            </div>
+        </div>
+
+        <div class="rope-track">
+            <div id="host-marker"></div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn-start" onclick="startGame()">Prepare Launch</button>
+            <button class="btn-reset" onclick="resetGame()">Reset Arena</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const gameId = "{{ game_id }}";
+    const clientId = "{{ client_id }}";
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/tow/ws/${gameId}/${clientId}`);
+
+    let startTime, timerInterval;
+
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === "UPDATE") {
+            document.getElementById('click-counter').innerText = data.counter;
+            document.getElementById('count-a').innerText = `Players: ${data.stats.A}`;
+            document.getElementById('count-b').innerText = `Players: ${data.stats.B}`;
+            document.getElementById('status-badge').innerText = data.active ? "LIVE" : (data.winner ? "FINISHED" : "WAITING");
+
+            const pos = 50 + (data.counter / data.target_n * 50);
+            document.getElementById('host-marker').style.left = `${pos}%`;
+
+            if (data.winner) {
+                const trophy = document.getElementById('winner-trophy');
+                trophy.style.display = "block";
+                document.getElementById('winner-name').innerText = data.winner;
+                clearInterval(timerInterval);
+            } else {
+                document.getElementById('winner-trophy').style.display = "none";
+            }
+        }
+    };
+
+    function startGame() {
+        ws.send(JSON.stringify({type: "START"}));
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            document.getElementById('match-timer').innerText = elapsed.toFixed(1) + "s";
+        }, 100);
+    }
+
+    function resetGame() {
+        ws.send(JSON.stringify({type: "RESET"}));
+        clearInterval(timerInterval);
+        document.getElementById('match-timer').innerText = "00:00.0";
+    }
+</script>
+</body>
+</html>

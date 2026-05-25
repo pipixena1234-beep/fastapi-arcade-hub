@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2X2 Rubik's Cube Loader</title>
+    <style>
+        :root {
+            --size: 60px;
+        }
+
+        body {
+            background: #000;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 120px;
+        }
+
+        .scene {
+            position: relative;
+            transform-style: preserve-3d;
+            animation: master-rotate 15s infinite linear;
+        }
+
+        @keyframes master-rotate {
+            0% {
+                transform: rotateX(-20deg) rotateY(0deg);
+            }
+            100% {
+                transform: rotateX(-20deg) rotateY(360deg);
+            }
+        }
+
+        .slice-wrapper {
+            position: absolute;
+            transform-style: preserve-3d;
+            transition: transform 0.4s ease-in-out;
+        }
+
+        .cubie {
+            position: absolute;
+            width: var(--size);
+            height: var(--size);
+            transform-style: preserve-3d;
+            margin: calc(var(--size) / -2);
+        }
+
+        .face {
+            position: absolute;
+            width: var(--size);
+            height: var(--size);
+            border: 2px solid #000;
+            border-radius: 4px;
+            opacity: 0.9;
+            box-sizing: border-box;
+        }
+
+        /* Fixed colors to map to classic Rubik's scheme */
+        .f  { transform: rotateY(0deg) translateZ(calc(var(--size) / 2)); background: #ff3d00; }
+        .bk { transform: rotateY(180deg) translateZ(calc(var(--size) / 2)); background: #ff9100; }
+        .r  { transform: rotateY(90deg) translateZ(calc(var(--size) / 2)); background: #2979ff; }
+        .l  { transform: rotateY(-90deg) translateZ(calc(var(--size) / 2)); background: #00e676; }
+        .t  { transform: rotateX(90deg) translateZ(calc(var(--size) / 2)); background: #fff; }
+        .bm { transform: rotateX(-90deg) translateZ(calc(var(--size) / 2)); background: #ffea00; }
+
+        .status-text {
+            letter-spacing: 5px;
+            animation: blink 1s infinite;
+            text-align: center;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.3;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="loading-container">
+    <div class="scene" id="cube"></div>
+    <div class="status-text" id="status">INITIALIZING...</div>
+</div>
+
+<script>
+    const cube = document.getElementById('cube');
+    const statusEl = document.getElementById('status');
+    const offset = 31; // Half of size (30px) + 1px spacing gap
+    const cubies = [];
+    const moveHistory = [];
+
+    // Initialize the 8 cubies for a 2x2 grid
+    for (let x of [-1, 1]) {
+        for (let y of [-1, 1]) {
+            for (let z of [-1, 1]) {
+                const el = document.createElement('div');
+                el.className = 'cubie';
+                el.innerHTML = `
+                    <div class="face f"></div>
+                    <div class="face bk"></div>
+                    <div class="face r"></div>
+                    <div class="face l"></div>
+                    <div class="face t"></div>
+                    <div class="face bm"></div>
+                `;
+                const c = { el, x: x * offset, y: y * offset, z: z * offset, matrix: new DOMMatrix() };
+                c.el.style.transform = `translate3d(${c.x}px, ${c.y}px, ${c.z}px)`;
+                cube.appendChild(el);
+                cubies.push(c);
+            }
+        }
+    }
+
+    function applyTransform(c) {
+        c.el.style.transform = `translate3d(${c.x}px, ${c.y}px, ${c.z}px) ${c.matrix.toString()}`;
+    }
+
+    async function rotateSlice(axis, side, angle) {
+        return new Promise(resolve => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'slice-wrapper';
+            cube.appendChild(wrapper);
+
+            // Filter cubies belonging to the active slice layer
+            const affected = cubies.filter(c => Math.round(c[axis]) === side);
+            affected.forEach(c => wrapper.appendChild(c.el));
+
+            // Force reflow/layout recalculation
+            wrapper.getBoundingClientRect();
+            wrapper.style.transform = `rotate${axis.toUpperCase()}(${angle}deg)`;
+
+            setTimeout(() => {
+                const moveMatrix = new DOMMatrix();
+                if (axis === 'x') moveMatrix.rotateSelf(angle, 0, 0);
+                if (axis === 'y') moveMatrix.rotateSelf(0, angle, 0);
+                if (axis === 'z') moveMatrix.rotateSelf(0, 0, angle);
+
+                affected.forEach(c => {
+                    // 1. Compute new translation position tracking coordinates
+                    const newPos = new DOMPoint(c.x, c.y, c.z).matrixTransform(moveMatrix);
+                    c.x = Math.round(newPos.x);
+                    c.y = Math.round(newPos.y);
+                    c.z = Math.round(newPos.z);
+
+                    // FIX: Pre-multiply the matrix so mutations stack in global orientation tracking
+                    c.matrix = moveMatrix.multiply(c.matrix);
+
+                    cube.appendChild(c.el);
+                    applyTransform(c);
+                });
+                wrapper.remove();
+                resolve();
+            }, 450); // Matches transitions speed closely
+        });
+    }
+
+    async function runCycle() {
+        // 1. Shuffle Phase
+        statusEl.innerText = "SHUFFLING_DATA...";
+        for (let i = 0; i < 10; i++) {
+            const axes = ['x', 'y', 'z'];
+            const axis = axes[Math.floor(Math.random() * 3)];
+            const side = Math.random() > 0.5 ? offset : -offset;
+            const angle = 90;
+
+            moveHistory.push({ axis, side, angle });
+            await rotateSlice(axis, side, angle);
+        }
+
+        // 2. Pause
+        statusEl.innerText = "ALGORITHM_FOUND";
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 3. Solve Phase (Reverse history perfectly)
+        statusEl.innerText = "RECONSTRUCTING...";
+        while (moveHistory.length > 0) {
+            const move = moveHistory.pop();
+            await rotateSlice(move.axis, move.side, -move.angle);
+        }
+
+        // 4. Reset & Loop
+        statusEl.innerText = "SEQUENCE_COMPLETE";
+        await new Promise(r => setTimeout(r, 2000));
+        runCycle();
+    }
+
+    // Begin looping
+    runCycle();
+</script>
+</body>
+</html>

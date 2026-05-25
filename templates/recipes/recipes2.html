@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ recipe.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+```
+<style>
+    body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        background: #f3f3f3;
+    }
+
+    /* Bottom sheet */
+    .bottom-sheet {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        max-height: 90vh;
+        background: #FFF6ED;
+        border-radius: 28px 28px 0 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+        overflow-y: auto;
+    }
+
+    /* Header */
+    .header {
+        text-align: center;
+        padding: 16px;
+        position: sticky;
+        top: 0;
+        background: #FFF6ED;
+        z-index: 10;
+    }
+
+    /* Drag handle */
+    .drag-handle {
+        width: 40px;
+        height: 5px;
+        background: #ccc;
+        border-radius: 100px;
+        margin: 0 auto 10px;
+    }
+
+    /* Title */
+    h1 {
+        margin: 0;
+        font-size: 24px;
+        color: #3E0184;
+    }
+
+    /* Image */
+    .recipe-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 16px;
+        margin-top: 10px;
+    }
+
+    /* Content */
+    .content {
+        padding: 20px;
+    }
+
+    /* Section titles */
+    h2 {
+        color: #550276;
+        margin-top: 20px;
+    }
+
+    /* Lists */
+    ul, ol {
+        font-size: 16px;
+        line-height: 1.6;
+        padding-left: 20px;
+    }
+
+    /* Ingredient items */
+    li {
+        margin-bottom: 10px;
+    }
+
+    /* Checkbox style */
+    input[type="checkbox"] {
+        margin-right: 10px;
+        transform: scale(1.2);
+    }
+</style>
+```
+
+</head>
+
+<body>
+
+<div class="bottom-sheet">
+
+```
+<!-- Header -->
+<div class="header">
+    <div class="drag-handle"></div>
+    <h1>{{ recipe.name }}</h1>
+
+    {% if recipe.image_url %}
+        <img src="{{ recipe.image_url }}" alt="{{ recipe.name }}" class="recipe-image">
+    {% endif %}
+</div>
+
+<!-- Content -->
+<div class="content">
+
+    <h2>Ingredients</h2>
+    <ul>
+        {% for item in recipe.ingredients %}
+            <li>
+                <label>
+                    <input type="checkbox">
+                    {{ item }}
+                </label>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <h2>Steps</h2>
+    <ol>
+        {% for step in recipe.steps %}
+            <li>{{ step }}</li>
+        {% endfor %}
+    </ol>
+
+</div>
+```
+
+</div>
+
+</body>
+</html>

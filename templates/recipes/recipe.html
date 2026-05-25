@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recipe Finder</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #fdf6e3; }
+        .container { background: white; padding: 30px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; width: 200px; }
+        button { padding: 10px 20px; background: #e27eac; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #results { margin-top: 20px; text-align: left; }
+        .recipe { border-bottom: 1px solid #eee; padding: 10px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Find a Recipe</h2>
+    <input type="text" id="ingredientInput" placeholder="Enter ingredient (e.g. eggs)">
+    <button onclick="fetchRecipes()">Search</button>
+
+    <div id="results"></div>
+</div>
+
+<script>
+    async function fetchRecipes() {
+        const ingredient = document.getElementById('ingredientInput').value;
+        const display = document.getElementById('results');
+        display.innerHTML = "Searching...";
+
+        try {
+            // We attach the ingredient as a 'query parameter' in the URL
+            const response = await fetch(`/recipe/search?item=${ingredient}`);
+            const data = await response.json();
+
+            display.innerHTML = ""; // Clear status
+
+            if (data.message) {
+                display.innerHTML = `<p>${data.message}</p>`;
+            } else {
+                data.forEach(recipe => {
+                    display.innerHTML += `
+                        <div class="recipe">
+                    
+                            <strong>${recipe.name}</strong><br>
+                            <small>Ingredients: ${recipe.ingredients.join(', ')}</small>
+                        </div>`;
+                });
+            }
+        } catch (err) {
+            display.innerHTML = "Error: Make sure the FastAPI server is running!";
+        }
+    }
+</script>
+
+</body>
+</html>

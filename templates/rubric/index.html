@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rubik's Cube - Fruit Color Core</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+
+    :root {
+        --bg-color: #050505;
+        --ui-green: #00ff7f;
+        --ui-red: #ff3b3b;
+        --ui-blue: #00d0ff;
+        --ui-orange: #ff8c00;
+        --ui-yellow: #ffd500;
+    }
+
+    body { 
+        margin:0; background: var(--bg-color); height: 100vh; 
+        display: flex; justify-content: center; align-items: center; 
+        perspective: 1500px; overflow: hidden; 
+        font-family: 'Orbitron', sans-serif;
+        background: radial-gradient(circle, rgba(0,255,127,0.03) 0%, #050505 80%);
+              cursor: grab;
+    }
+    /* State when the mouse is held down */
+    body.is-grabbing {
+        cursor: grabbing !important;
+    }
+
+    /* Ensure UI elements keep their pointer cursors */
+    .action-btn, #overlay, kbd {
+        cursor: pointer;
+    }
+
+
+    #overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.95); z-index: 1000;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        color: var(--ui-green); cursor: pointer; text-align: center;
+        transition: 0.5s;
+    }
+
+    #overlay:hover h2 { text-shadow: 0 0 20px var(--ui-green); }
+    #overlay h2 { margin: 0; font-size: 3rem; letter-spacing: 10px; transition: 0.3s; }
+    #overlay p { margin: 10px 0 0 0; opacity: 0.8; letter-spacing: 4px; }
+
+    .hud-panel {
+        position: absolute; color: var(--ui-green);
+        padding: 20px; border: 1px solid rgba(0,255,127,0.2);
+        background: rgba(0,0,0,0.8); pointer-events: auto;
+        backdrop-filter: blur(5px);
+    }
+
+    #splash-canvas {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 1500;
+    }
+
+    #juice-reward {
+        position: fixed; top: 55%; left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        font-size: 180px; z-index: 3000;
+        pointer-events: none;
+        filter: drop-shadow(0 0 30px var(--ui-green));
+        transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    #juice-reward.show { transform: translate(-50%, -50%) scale(1); animation: fizzy 1s infinite alternate ease-in-out; }
+
+    @keyframes fizzy {
+        from { filter: drop-shadow(0 0 20px var(--ui-green)); transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+        to { filter: drop-shadow(0 0 50px var(--ui-blue)); transform: translate(-50%, -50%) scale(1.1) rotate(2deg); }
+    }
+
+
+
+  #controls-hud { left: 20px; bottom: 20px; font-size: 0.7rem; border-left: 4px solid var(--ui-green); }
+    #action-hud { right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+
+    .action-btn {
+        background: transparent; border: 1px solid var(--ui-green);
+        color: var(--ui-green); padding: 10px 20px; cursor: pointer;
+        font-family: 'Orbitron', sans-serif; text-transform: uppercase;
+        transition: all 0.2s; letter-spacing: 2px;
+    }
+
+    .action-btn:hover { background: var(--ui-green); color: #000; box-shadow: 0 0 15px var(--ui-green); }
+    .action-btn.demo { border-color: var(--ui-blue); color: var(--ui-blue); }
+    .action-btn.demo:hover { background: var(--ui-blue); color: #000; box-shadow: 0 0 15px var(--ui-blue); }
+    .action-btn.reset { border-color: var(--ui-red); color: var(--ui-red); }
+    .action-btn.reset:hover { background: var(--ui-red); color: #000; box-shadow: 0 0 15px var(--ui-red); }
+
+    kbd { background: #222; color: #fff; padding: 1px 4px; border-radius: 3px; border: 1px solid #444; }
+
+    .scene { width:0; height:0; }
+	.cube { 
+        position:relative; 
+        transform-style:preserve-3d; 
+        /* Removed the infinite animation to allow manual control */
+        transform: rotateX(var(--rx, -20deg)) rotateY(var(--ry, 0deg));
+        transition: transform 0.1s ease-out; /* Adds a bit of 'weight' to the drag */
+    }
+
+    .cubie { position:absolute; width:100px; height:100px; transform-style:preserve-3d; left:-50px; top:-50px; }
+    
+.face { 
+        position:absolute; width:100%; height:100%; border:4px solid #000; 
+        box-sizing:border-box; border-radius:10px; 
+        display: flex; align-items: center; justify-content: center;
+        font-size: 45px; 
+        backface-visibility: hidden;
+        /* Added cubic-bezier for a "bouncy" pop effect */
+        transition: box-shadow 0.3s, border-color 0.3s, transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+          transition: box-shadow 0.3s, border-color 0.3s, opacity 0.5s, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-style: preserve-3d;
+    }
+  
+  .face.dissolve { 
+        opacity: 0; 
+        transform: scale(1.5) !important; 
+        transition: all 0.4s ease-out; 
+    }
+    /* The "Card" is hidden and flipped initially during reconstruction */
+    .face.flipped-off {
+        opacity: 0;
+        transform: rotateY(180deg) translateZ(50px) !important;
+    }
+    
+    .f { background: var(--ui-red); }
+    .b { background: var(--ui-orange); }
+    .r { background: var(--ui-green); }
+    .l { background: var(--ui-blue); }
+    .u { background: #fff; }
+    .d { background: var(--ui-yellow); }
+
+    #victory-msg {
+        position: fixed;top:30%;left:50%;margin: auto;transform: translate(-50%, -50%);
+        color: #fff; font-size: 2rem; letter-spacing: 15px;
+        text-shadow: 0 0 20px var(--ui-green); z-index: 2500; opacity: 0; display: none;
+        pointer-events: none;
+    }
+
+    .flicker-show { display: block !important; animation: flicker 0.5s forwards; }
+    @keyframes flicker { 0% { opacity: 0; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    .face.solved-glow { border-color: rgba(255,255,255,0.9); box-shadow: 0 0 40px rgba(255,255,255,0.5); }
+  
+  .flying-fruit {
+        position: fixed;
+        pointer-events: none;
+        font-size: 45px;
+        z-index: 2000;
+        transition: opacity 0.8s ease-in;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="splash-canvas"></canvas>
+<div id="victory-msg">EARNED <br>TROPICAL FRUIT JUICE</div>
+<div id="juice-reward">🍹</div>
+
+<div id="overlay">
+    <h2>READY TO JUICE</h2>
+    <p>CLICK TO SQUISH THE FRUIT</p>
+</div>
+
+<div id="controls-hud" class="hud-panel">
+    <strong>HORIZONTAL</strong><br>
+    TOP: <kbd>W</kbd>/<kbd>S</kbd> | MID: <kbd>A</kbd>/<kbd>D</kbd> | BTM: <kbd>X</kbd>/<kbd>C</kbd><br><br>
+    <strong>VERTICAL</strong><br>
+    LEFT: <kbd>Q</kbd>/<kbd>Z</kbd> | MID: <kbd>↑</kbd>/<kbd>↓</kbd> | RIGHT: <kbd>E</kbd>/<kbd>R</kbd>
+</div>
+
+<div id="action-hud" class="hud-panel">
+    <button class="action-btn" onclick="autoScramble(10)">Fruit Squish</button>
+    <button class="action-btn demo" onclick="solveCube()">Juice Blend</button>
+    <button class="action-btn reset" onclick="location.reload()">Remake</button>
+</div>
+
+<div class="scene">
+    <div class="cube" id="cube"></div>
+</div>
+
+<script>
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const canvas = document.getElementById('splash-canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let isAnimating = false;
+let moveHistory = [];
+
+const fruitMap = { f: "🍎", b: "🍊", r: "🍏", l: "🍇", u: "🥥", d: "🍌" };
+const colorMap = { f: "#ff3b3b", b: "#ff8c00", r: "#00ff7f", l: "#00d0ff", u: "#ffffff", d: "#ffd500" };
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize); resize();
+
+// SOUND ENGINES
+function playTurnSound() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playSolveSound() {
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + (i * 0.1));
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime + (i * 0.1));
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + (i * 0.1) + 0.8);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + (i * 0.1));
+        osc.stop(audioCtx.currentTime + (i * 0.1) + 1);
+    });
+}
+
+const cube = document.getElementById("cube");
+const spacing = 101; 
+let cubies = [];
+
+document.getElementById('overlay').addEventListener('click', function() {
+    this.style.opacity = '0';
+    setTimeout(() => this.style.display = 'none', 500);
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+});
+
+// INIT CUBE WITH BLACK INTERNAL FACES
+for(let x=-1; x<=1; x++) {
+    for(let y=-1; y<=1; y++) {
+        for(let z=-1; z<=1; z++) {
+            const el = document.createElement("div");
+            el.className = "cubie";
+            el.style.transform = `translate3d(${x*spacing}px, ${y*spacing}px, ${z*spacing}px)`;
+            
+            ["f","b","r","l","u","d"].forEach(f => {
+                const face = document.createElement("div");
+                face.className = "face " + f;
+                
+                // Check if this face is on the outside
+                const isFront = (f === "f" && z === 1);
+                const isBack = (f === "b" && z === -1);
+                const isRight = (f === "r" && x === 1);
+                const isLeft = (f === "l" && x === -1);
+                const isUp = (f === "u" && y === -1);
+                const isDown = (f === "d" && y === 1);
+
+                if (isFront || isBack || isRight || isLeft || isUp || isDown) {
+                    // It's an exterior face: show fruit
+                    face.innerText = fruitMap[f]; 
+                } else {
+                    // It's a hidden/interior face: make it solid black
+                    face.style.background = "#000";
+                    face.innerText = "";
+                }
+                
+                // Positioning logic remains the same
+                if(f==="f") face.style.transform = "rotateY(0deg) translateZ(50px)";
+                if(f==="b") face.style.transform = "rotateY(180deg) translateZ(50px)";
+                if(f==="r") face.style.transform = "rotateY(90deg) translateZ(50px)";
+                if(f==="l") face.style.transform = "rotateY(-90deg) translateZ(50px)";
+                if(f==="u") face.style.transform = "rotateX(90deg) translateZ(50px)";
+                if(f==="d") face.style.transform = "rotateX(-90deg) translateZ(50px)";
+                
+                el.appendChild(face);
+            });
+            cube.appendChild(el);
+            cubies.push({ el, x, y, z });
+        }
+    }
+}
+
+async function rotateLayer(axis, index, dir, saveToHistory = true) {
+    if(isAnimating) return;
+    isAnimating = true;
+    if(saveToHistory) moveHistory.push({axis, index, dir});
+    
+    playTurnSound();
+    
+    const angle = 90 * dir;
+    const layer = cubies.filter(c => Math.round(c[axis]) === index);
+    const wrapper = document.createElement("div");
+    wrapper.style.transformStyle = "preserve-3d";
+    wrapper.style.transition = "transform 0.2s ease-out";
+    cube.appendChild(wrapper);
+    layer.forEach(c => wrapper.appendChild(c.el));
+    
+    await new Promise(r => requestAnimationFrame(() => {
+        wrapper.style.transform = `rotate${axis.toUpperCase()}(${angle}deg)`;
+        r();
+    }));
+    
+    await new Promise(r => setTimeout(r, 220));
+    
+    layer.forEach(c => {
+        const old = { x: c.x, y: c.y, z: c.z };
+        const rad = (angle * Math.PI) / 180;
+        const s = Math.round(Math.sin(rad)), cos = Math.round(Math.cos(rad));
+        if(axis === 'x') { c.y = old.y * cos - old.z * s; c.z = old.y * s + old.z * cos; }
+        else if(axis === 'y') { c.x = old.x * cos + old.z * s; c.z = -old.x * s + old.z * cos; }
+        else if(axis === 'z') { c.x = old.x * cos - old.y * s; c.y = old.x * s + old.y * cos; }
+        
+        const currentMatrix = new DOMMatrix(getComputedStyle(c.el).transform);
+        const wrapperMatrix = new DOMMatrix(getComputedStyle(wrapper).transform);
+        c.el.style.transform = wrapperMatrix.multiply(currentMatrix).toString();
+        cube.appendChild(c.el);
+    });
+    cube.removeChild(wrapper);
+    isAnimating = false;
+}
+
+async function autoScramble(count) {
+    for(let i=0; i<count; i++) {
+        const axes = ['x', 'y', 'z'];
+        await rotateLayer(axes[Math.floor(Math.random()*3)], Math.floor(Math.random()*3)-1, Math.random()>0.5?1:-1);
+    }
+}
+
+async function solveCube() {
+    if(moveHistory.length === 0) return;
+    while(moveHistory.length > 0) {
+        const lastMove = moveHistory.pop();
+        await rotateLayer(lastMove.axis, lastMove.index, -lastMove.dir, false);
+    }
+    triggerVictoryEffect();
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.color = color;
+        this.size = Math.random() * 10 + 5;
+        this.speedX = (Math.random() - 0.5) * 20;
+        this.speedY = (Math.random() - 0.5) * 20;
+        this.gravity = 0.4; this.life = 1; this.decay = Math.random() * 0.03 + 0.01;
+    }
+    update() { this.x += this.speedX; this.y += this.speedY; this.speedY += this.gravity; this.life -= this.decay; }
+    draw() { ctx.fillStyle = this.color; ctx.globalAlpha = this.life; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill(); }
+}
+function triggerVictoryEffect() {
+    const msg = document.getElementById('victory-msg');
+    const juiceGlass = document.getElementById('juice-reward');
+    const faces = document.querySelectorAll('.face');
+    
+    playSolveSound();
+    msg.classList.add('flicker-show');
+    juiceGlass.classList.add('show');
+
+    // 1. EXPLOSION PHASE
+    faces.forEach((f) => {
+        if (f.innerText !== "" && !f.style.background.includes("rgb(0, 0, 0)")) {
+            const rect = f.getBoundingClientRect();
+            const color = window.getComputedStyle(f).backgroundColor;
+            const fruitChar = f.innerText;
+
+            // Create Flying Fruit
+            const flying = document.createElement('div');
+            flying.className = 'flying-fruit';
+            flying.innerText = fruitChar;
+            flying.style.left = rect.left + 'px';
+            flying.style.top = rect.top + 'px';
+            document.body.appendChild(flying);
+
+            // Physics for flight
+            let posX = rect.left, posY = rect.top;
+            let velX = (Math.random() - 0.5) * 40;
+            let velY = (Math.random() - 0.8) * 40;
+            let rotation = 0, rotSpeed = (Math.random() - 0.5) * 30;
+            let gravity = 0.7, opacity = 1;
+
+            function fly() {
+                posX += velX; posY += velY; velY += gravity;
+                rotation += rotSpeed; opacity -= 0.015;
+                flying.style.transform = `translate(${posX - rect.left}px, ${posY - rect.top}px) rotate(${rotation}deg)`;
+                flying.style.opacity = opacity;
+                if (Math.random() > 0.4 && opacity > 0) {
+                    particles.push(new Particle(posX + 25, posY + 25, color));
+                }
+                if (opacity > 0) requestAnimationFrame(fly);
+                else flying.remove();
+            }
+            requestAnimationFrame(fly);
+
+            // Hide the actual cube face and set it to "flipped" state
+            f.classList.add('flipped-off');
+        }
+    });
+
+    // Start particle engine
+    requestAnimationFrame(animateJuice);
+
+    // 2. RECONSTRUCTION PHASE (The Card Flip)
+    setTimeout(() => {
+        // Reset internal cube logic to solved state
+        moveHistory = [];
+        cubies.forEach(c => {
+            c.el.style.transform = `translate3d(${c.x * spacing}px, ${c.y * spacing}px, ${c.z * spacing}px)`;
+        });
+
+        // Flip the cards back in one by one (staggered)
+        faces.forEach((f, i) => {
+            setTimeout(() => {
+                f.classList.remove('flipped-off');
+                // Re-apply original face transform based on its class
+                const type = f.classList[1]; // f, b, r, l, u, d
+                if(type==="f") f.style.transform = "rotateY(0deg) translateZ(50px)";
+                if(type==="b") f.style.transform = "rotateY(180deg) translateZ(50px)";
+                if(type==="r") f.style.transform = "rotateY(90deg) translateZ(50px)";
+                if(type==="l") f.style.transform = "rotateY(-90deg) translateZ(50px)";
+                if(type==="u") f.style.transform = "rotateX(90deg) translateZ(50px)";
+                if(type==="d") f.style.transform = "rotateX(-90deg) translateZ(50px)";
+            }, i * 20); // 20ms stagger for a "wave" flip effect
+        });
+
+        setTimeout(() => {
+            msg.classList.remove('flicker-show');
+            juiceGlass.classList.remove('show');
+        }, 1500);
+
+    }, 3000); 
+}
+
+function animateJuice() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach((p, i) => {
+        p.update(); p.draw();
+        if (p.life <= 0) particles.splice(i, 1);
+    });
+    if (particles.length > 0) requestAnimationFrame(animateJuice);
+}
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if(key === 'q') rotateLayer('x', -1, -1);
+    if(key === 'z') rotateLayer('x', -1, 1);
+    if(e.key === 'ArrowUp') rotateLayer('x', 0, -1);
+    if(e.key === 'ArrowDown') rotateLayer('x', 0, 1);
+    if(key === 'e') rotateLayer('x', 1, -1);
+    if(key === 'r') rotateLayer('x', 1, 1);
+    if(key === 'w') rotateLayer('y', -1, 1);
+    if(key === 's') rotateLayer('y', -1, -1);
+    if(key === 'a') rotateLayer('y', 0, 1);
+    if(key === 'd') rotateLayer('y', 0, -1);
+    if(key === 'x') rotateLayer('y', 1, 1);
+    if(key === 'c') rotateLayer('y', 1, -1);
+});
+// --- UPDATED MOUSE ROTATION LOGIC ---
+let isDragging = false;
+let lastMouseX, lastMouseY;
+let rotX = -20; 
+let rotY = 0;   
+
+window.addEventListener('mousedown', (e) => {
+    // Don't change cursor or drag if clicking UI
+    if (e.target.closest('.hud-panel') || e.target.closest('#overlay')) return;
+    
+    isDragging = true;
+    document.body.classList.add('is-grabbing'); // Change cursor to closed hand
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - lastMouseX;
+    const deltaY = e.clientY - lastMouseY;
+
+    rotY += deltaX * 0.5;
+    rotX -= deltaY * 0.5;
+
+    const cubeEl = document.getElementById('cube');
+    cubeEl.style.setProperty('--rx', `${rotX}deg`);
+    cubeEl.style.setProperty('--ry', `${rotY}deg`);
+
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+    isDragging = false;
+    document.body.classList.remove('is-grabbing'); // Revert cursor to open hand
+});
+
+// Also remove it if the mouse leaves the window entirely
+window.addEventListener('mouseleave', () => {
+    isDragging = false;
+    document.body.classList.remove('is-grabbing');
+});
+</script>
+</body>
+</html>
